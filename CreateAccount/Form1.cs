@@ -16,15 +16,37 @@ using System.Configuration;
 
 namespace CreateAccount
 {
+    public class Info
+    {
+        public string firstName;
+        public string lastName;
+        public string email;
+        public string emailPassword;
+        public string applePassword;
+        public Info(string _fName,string _lName, string _e,string _ePw, string _aPw)
+        {
+            firstName = _fName;
+            lastName = _lName;
+            email = _e;
+            emailPassword = _ePw;
+            applePassword = _aPw;
+        }
+    }
+
     public partial class Form1 : Form
     {
         public IWebDriver emailDriver;
         public IWebDriver appleDrive;
         public int timeout;//5s
+        IList<Info> infos;
+        int current;
+
         public Form1()
         {
             InitializeComponent();
             timeout = Convert.ToInt16(ConfigurationManager.AppSettings["waitTime"].ToString());
+            current = 0;
+            infos = new List<Info>();
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -36,25 +58,19 @@ namespace CreateAccount
             //{
             //    fileName = openFile.FileName;
             //}
-
-            try
+            DataTable data = ParseExcelFile(fileName);
+            data.Rows[0].Delete();
+            data.AcceptChanges();
+            foreach(DataRow row in data.Rows)
             {
-                DataTable data = ParseExcelFile(fileName);
-                data.Rows[0].Delete();
-                data.AcceptChanges();
-
-                if (data.Rows.Count > 0)
-                    foreach (DataRow row in data.Rows)
-                    {
-                        if (string.IsNullOrEmpty(row[0].ToString()))
-                            continue;
-                        CreateAccountApple(row[2].ToString(), row[1].ToString(), row[0].ToString(), row[4].ToString());
-                    }
+                Info info = new Info(row[1].ToString(), row[0].ToString(), row[2].ToString(),
+                    row[3].ToString(), row[4].ToString());
+                infos.Add(info);
             }
-            catch { }
+            button1.Enabled = false;
         }
 
-        private void OpenEmail(string email, string password)
+        private string OpenEmail(string email, string password)
         {
             emailDriver = new ChromeDriver();
             emailDriver.Url = "https://mail.google.com";
@@ -65,23 +81,32 @@ namespace CreateAccount
             Thread.Sleep(timeout);
             emailDriver.FindElement(By.Name("password")).SendKeys(password);
             emailDriver.FindElement(By.Name("password")).SendKeys(OpenQA.Selenium.Keys.Enter);
+
+            Thread.Sleep(2*timeout);
+            try
+            {
+                emailDriver.FindElement(By.XPath("//span[contains(text(),'Verify your Apple ID email address')]")).Click();
+            }
+            catch { }            
+            Thread.Sleep(timeout);
+            return emailDriver.FindElement(By.XPath("//td[contains(@class,'verification-code')]")).Text;
         }
 
-        private void CloseEmail()
+        private void Close()
         {
             //Signout
 
             //Close
             emailDriver.Dispose();
             emailDriver.Close();
+            appleDrive.Dispose();
+            appleDrive.Close();
         }
 
         private void CreateAccountApple(string email, string firstName, string lastName, string password)
         {
             try
             {
-
-
                 appleDrive = new ChromeDriver();
                 appleDrive.Url = "https://appleid.apple.com/account#!&page=create";
                 Thread.Sleep(timeout);
@@ -89,34 +114,16 @@ namespace CreateAccount
                 appleDrive.FindElement(By.XPath("//input[@placeholder='last name']")).SendKeys(lastName);
                 appleDrive.FindElement(By.XPath("//input[@placeholder='birthday']")).SendKeys("11/11/1990");
                 appleDrive.FindElement(By.XPath("//input[@placeholder='name@example.com']")).SendKeys(email);
-                //appleDrive.FindElement(By.XPath("//*[@id='name1524047451989 - 0']")).SendKeys(firstName);
-                //appleDrive.FindElement(By.XPath("//*[@id='name1524047452002-0']")).SendKeys(lastName);
-                //appleDrive.FindElement(By.Id("input - 1524046911076 - 1")).SendKeys("11/11/1990");                
-                //appleDrive.FindElement(By.Id("input - 1524046911103 - 0")).SendKeys(email);
-                //
-                //appleDrive.FindElement(By.XPath("//*[@id='confirm - password - input']")).Click();
                 appleDrive.FindElement(By.XPath("//*[@id='confirm-password-input']")).SendKeys(password);
-
-                //var dropdown = new SelectElement(driver.findElement(By.id("designation")));
-                //appleDrive.FindElement(By.PartialLinkText("security-questions-answers/div/div[1]")).Click();
+                
                 IList<IWebElement> selects = appleDrive.FindElements(By.TagName("select"));
                 for(int i=1;i<selects.Count;i++)
                 {
                     IList<IWebElement> options = selects[i].FindElements(By.TagName("option"));
                     options[i].Click();
-                    appleDrive.FindElements(By.XPath("//input[@placeholder='answer']"))[i-1].SendKeys(firstName);
-                    //IWebElement select = options[i].FindElement(By.TagName("option"));
-                    //select.Click();
-                }
-                //IWebElement select = appleDrive.FindElement(By.TagName("select"));
-                //IWebElement firstOption = select.FindElement(By.TagName("option"));
-
-                //appleDrive.FindElement(By.XPath("//select[contains(@id, 'security-questions-answers/div/div[1]')]")).Click();
-                appleDrive.FindElements(By.XPath("//input[@placeholder='answer']"))[0].SendKeys(firstName);
-                //appleDrive.FindElement(By.XPath("//*[@id='idms-step-1524130815766-0']/div[2]/div/div/div[4]/div/div/div/security-questions-answers/div/div[1]/security-question/div/div[1]/select")).Click();
-                //appleDrive.FindElement(By.XPath("//*[@id='idms-step-1524130815766-0']/div[2]/div/div/div[4]/div/div/div/security-questions-answers/div/div[2]/security-question/div/div[1]/select")).Click();
-                //appleDrive.FindElement(By.XPath("//*[@id='idms-step-1524130815766-0']/div[2]/div/div/div[4]/div/div/div/security-questions-answers/div/div[3]/security-question/div/div[1]/select")).Click();
-                
+                    appleDrive.FindElements(By.XPath("//input[@placeholder='answer']"))[i-1].
+                        SendKeys(firstName+DateTime.Now.ToString("o"));
+                }                
                 appleDrive.FindElement(By.XPath("//*[@id='password']")).SendKeys(password + OpenQA.Selenium.Keys.Tab);
             }
             catch(Exception ex)
@@ -149,6 +156,30 @@ namespace CreateAccount
                 MessageBox.Show(ex.Message, "Couldnot parse file");
             }
             return results;
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                CreateAccountApple(infos[current].email, infos[current].firstName,
+                    infos[current].lastName, infos[current].applePassword);
+                Thread.Sleep(5*timeout);
+                string result = OpenEmail(infos[current].email, infos[current].emailPassword);
+
+                for(int i =0;i<6;i++)
+                {
+                    //*[@id="char0"]
+                    string id = "char" + i.ToString();
+                    appleDrive.FindElement(By.XPath("//input[@id='"+id.ToString() + "']"))
+                        .SendKeys(result[i].ToString());                    
+                }
+                appleDrive.FindElement(By.XPath("//div[contains(text(),'Continue')]")).Click();
+                Thread.Sleep(timeout);
+                Close();
+                current++;
+            }
+            catch { }
         }
     }
 }
