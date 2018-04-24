@@ -16,22 +16,7 @@ using System.Configuration;
 
 namespace CreateAccount
 {
-    public class Info
-    {
-        public string firstName;
-        public string lastName;
-        public string email;
-        public string emailPassword;
-        public string applePassword;
-        public Info(string _fName,string _lName, string _e,string _ePw, string _aPw)
-        {
-            firstName = _fName;
-            lastName = _lName;
-            email = _e;
-            emailPassword = _ePw;
-            applePassword = _aPw;
-        }
-    }
+   
 
     public partial class Form1 : Form
     {
@@ -51,13 +36,13 @@ namespace CreateAccount
 
         private void button1_Click(object sender, EventArgs e)
         {
-            string fileName = @"C:\Users\Longhd\Desktop\Demo1.xlsx";
-            //OpenFileDialog openFile = new OpenFileDialog();
-            //DialogResult file = openFile.ShowDialog();
-            //if (file == DialogResult.OK)
-            //{
-            //    fileName = openFile.FileName;
-            //}
+            string fileName="";// = @"C:\Users\Longhd\Desktop\Demo1.xlsx";
+            OpenFileDialog openFile = new OpenFileDialog();
+            DialogResult file = openFile.ShowDialog();
+            if (file == DialogResult.OK)
+            {
+                fileName = openFile.FileName;
+            }
             DataTable data = ParseExcelFile(fileName);
             data.Rows[0].Delete();
             data.AcceptChanges();
@@ -180,6 +165,23 @@ namespace CreateAccount
                 current++;
             }
             catch { }
+        }
+    }
+
+    public class Info
+    {
+        public string firstName;
+        public string lastName;
+        public string email;
+        public string emailPassword;
+        public string applePassword;
+        public Info(string _fName, string _lName, string _e, string _ePw, string _aPw)
+        {
+            firstName = _fName;
+            lastName = _lName;
+            email = _e;
+            emailPassword = _ePw;
+            applePassword = _aPw;
         }
     }
 }
